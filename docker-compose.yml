@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       asm
+      POSTGRES_USER:     asm
+      POSTGRES_PASSWORD: asm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL:   postgresql+asyncpg://asm:asm@postgres:5432/asm
+      REDIS_URL:      redis://redis:6379/0
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      GITHUB_TOKEN:   ${GITHUB_TOKEN:-}
+      DEBUG:          ${DEBUG:-false}
+      REPORT_DIR:     /app/reports
+    volumes:
+      - reports:/app/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  streamlit:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: streamlit run /app/streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE: http://backend:8000
+    volumes:
+      - ./streamlit_app:/app/streamlit_app:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  reports:

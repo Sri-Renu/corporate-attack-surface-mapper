@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OSINT Attack Surface Mapper</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080B12;
+    --surface: #0E1420;
+    --surface2: #141C2B;
+    --border: #1E2D45;
+    --accent: #00D4FF;
+    --accent2: #7C3AED;
+    --critical: #FF3B3B;
+    --high: #FF7A00;
+    --medium: #FFB800;
+    --low: #00C853;
+    --minimal: #00E5FF;
+    --text: #E8EAF0;
+    --muted: #5A6A82;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,11,18,0.9);
+    backdrop-filter: blur(20px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text);
+  }
+  .logo-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-top: 2px;
+  }
+  .header-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── SCAN FORM ── */
+  .scan-section {
+    padding: 60px 24px 40px;
+    text-align: center;
+  }
+  .scan-title {
+    font-family: var(--mono);
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  .scan-title span { color: var(--accent); }
+  .scan-subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 40px;
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .scan-form {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .form-row {
+    display: flex; gap: 12px; margin-bottom: 16px;
+  }
+  .input-group {
+    flex: 1;
+    position: relative;
+  }
+  .input-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    display: block;
+    margin-bottom: 6px;
+    text-align: left;
+  }
+  .input-field {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .input-field::placeholder { color: var(--muted); }
+  .input-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+  }
+  .btn-scan {
+    background: linear-gradient(135deg, var(--accent), #0099CC);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 32px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+    align-self: flex-end;
+  }
+  .btn-scan:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,212,255,0.3);
+  }
+  .btn-scan:disabled {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+  }
+  .advanced-toggle {
+    font-size: 12px; color: var(--muted); cursor: pointer;
+    background: none; border: none; font-family: var(--sans);
+    text-decoration: underline; margin-bottom: 12px;
+  }
+  .advanced-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    text-align: left;
+  }
+  .demo-notice {
+    font-size: 11px; color: var(--muted); margin-top: 8px;
+    font-style: italic;
+  }
+  .demo-notice a { color: var(--accent); text-decoration: none; }
+
+  /* ── PROGRESS ── */
+  .progress-section {
+    max-width: 700px; margin: 0 auto 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .progress-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+  }
+  .progress-title {
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .progress-pct {
+    font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--text);
+  }
+  .progress-bar-bg {
+    background: var(--border);
+    border-radius: 4px; height: 6px; margin-bottom: 12px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    position: relative;
+  }
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute; right: 0; top: -3px; bottom: -3px;
+    width: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+  }
+  .progress-stage {
+    font-size: 13px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pulse-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.6); }
+  }
+  .scan-log {
+    margin-top: 16px;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    max-height: 120px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+  }
+  .log-line { margin-bottom: 3px; }
+  .log-line.ok { color: var(--low); }
+  .log-line.warn { color: var(--medium); }
+  .log-line.err { color: var(--critical); }
+  .log-line.info { color: var(--accent); }
+
+  /* ── RESULTS DASHBOARD ── */
+  .results { padding: 0 24px 60px; }
+
+  .results-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 32px; flex-wrap: wrap; gap: 16px;
+  }
+  .target-info h2 {
+    font-family: var(--mono); font-size: 22px; color: var(--text);
+  }
+  .target-info p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .action-btns { display: flex; gap: 10px; }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── SCORE CARDS ── */
+  .score-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .overall-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .overall-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(0,212,255,0.08), transparent 60%);
+  }
+  .score-ring {
+    position: relative;
+    width: 140px; height: 140px;
+    margin-bottom: 16px;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring-text {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .score-number {
+    font-family: var(--mono);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .score-max {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .risk-badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 2px solid;
+  }
+  .breach-prob {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .breach-prob strong { color: var(--text); }
+
+  .dimension-grid {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .dimension-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 60px 80px;
+    align-items: center;
+    gap: 16px;
+  }
+  .dim-name {
+    font-size: 13px; font-weight: 500; color: var(--text);
+  }
+  .dim-bar-bg {
+    background: var(--border); border-radius: 4px; height: 8px; overflow: hidden;
+  }
+  .dim-bar-fill {
+    height: 100%; border-radius: 4px; transition: width 1s ease;
+  }
+  .dim-score {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--muted); text-align: right;
+  }
+  .dim-label {
+    font-family: var(--mono); font-size: 10px;
+    font-weight: 700; letter-spacing: 0.1em;
+    text-align: center; padding: 3px 0;
+    border-radius: 4px;
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-size: 12px; color: var(--muted); font-weight: 500;
+  }
+  .stat-sub {
+    font-size: 11px; color: var(--muted); margin-top: 4px;
+  }
+
+  /* ── FINDINGS TABLE ── */
+  .findings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-title {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--accent); letter-spacing: 0.15em;
+    font-weight: 700;
+  }
+  .section-count {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .finding-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    display: grid;
+    grid-template-columns: 90px 1fr auto;
+    gap: 16px;
+    align-items: start;
+    transition: background 0.15s;
+  }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-item:hover { background: var(--surface2); }
+  .severity-pill {
+    font-family: var(--mono); font-size: 10px;
+    font-weight: 700; letter-spacing: 0.1em;
+    padding: 4px 8px; border-radius: 4px;
+    display: inline-block; text-align: center;
+  }
+  .sev-CRITICAL { background: rgba(255,59,59,0.15); color: var(--critical); border: 1px solid rgba(255,59,59,0.3); }
+  .sev-HIGH { background: rgba(255,122,0,0.15); color: var(--high); border: 1px solid rgba(255,122,0,0.3); }
+  .sev-MEDIUM { background: rgba(255,184,0,0.15); color: var(--medium); border: 1px solid rgba(255,184,0,0.3); }
+  .sev-LOW { background: rgba(0,200,83,0.15); color: var(--low); border: 1px solid rgba(0,200,83,0.3); }
+
+  .finding-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .finding-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .finding-rec { font-size: 11px; color: #7EC8A0; margin-top: 6px; font-style: italic; }
+  .finding-category {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  /* ── DNS/SUBDOMAIN CHIPS ── */
+  .chips-wrap {
+    padding: 16px 20px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .chip {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { border-color: var(--low); color: var(--low); }
+
+  /* ── EMAIL SECURITY VISUAL ── */
+  .email-checks {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .email-check {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .check-icon { font-size: 24px; margin-bottom: 8px; }
+  .check-name {
+    font-family: var(--mono); font-size: 12px;
+    font-weight: 700; letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+  .check-status {
+    font-size: 11px;
+  }
+  .check-pass { color: var(--low); }
+  .check-fail { color: var(--critical); }
+  .check-warn { color: var(--medium); }
+
+  /* ── TECH STACK ── */
+  .tech-chips {
+    padding: 16px 20px;
+    display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .tech-chip {
+    background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.3);
+    color: #C4B5FD;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px; font-weight: 500;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex; gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px 10px 0 0;
+    padding: 4px;
+    margin-bottom: -1px;
+  }
+  .tab-btn {
+    padding: 8px 16px; border-radius: 7px;
+    border: none; background: none; cursor: pointer;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); letter-spacing: 0.1em;
+    transition: all 0.15s;
+  }
+  .tab-btn.active { background: var(--surface2); color: var(--accent); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeUp 0.4s ease forwards; }
+  .fade-in-delay-1 { animation: fadeUp 0.4s 0.1s ease both; }
+  .fade-in-delay-2 { animation: fadeUp 0.4s 0.2s ease both; }
+  .fade-in-delay-3 { animation: fadeUp 0.4s 0.3s ease both; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .score-grid { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .dimension-row { grid-template-columns: 120px 1fr 50px; }
+    .dim-label { display: none; }
+    .form-row { flex-direction: column; }
+    .advanced-panel { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .stat-row { grid-template-columns: 1fr 1fr; }
+    .finding-item { grid-template-columns: 1fr; }
+    .finding-category { display: none; }
+    .email-checks { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">SURFACE.MAP</div>
+        <div class="logo-sub">CORPORATE ATTACK SURFACE MAPPER</div>
+      </div>
+    </div>
+    <div class="header-badge">OSINT + ML ENGINE v1.0</div>
+  </div>
+</header>
+
+<div id="app">
+
+  <!-- SCAN FORM -->
+  <section class="scan-section" id="scan-form-section">
+    <div class="container">
+      <h1 class="scan-title">Map. Score. <span>Expose.</span></h1>
+      <p class="scan-subtitle">Automated OSINT-powered attack surface intelligence for any domain. DNS, ports, certs, GitHub leaks, email security — all in one scan.</p>
+
+      <div class="scan-form">
+        <div class="form-row">
+          <div class="input-group" style="flex:2">
+            <label class="input-label">TARGET DOMAIN</label>
+            <input id="domain-input" class="input-field" type="text" placeholder="example.com" autocomplete="off" spellcheck="false"/>
+          </div>
+          <div class="input-group">
+            <label class="input-label">COMPANY NAME (Optional)</label>
+            <input id="company-input" class="input-field" type="text" placeholder="Acme Corp" autocomplete="off"/>
+          </div>
+        </div>
+
+        <div style="text-align:left; margin-bottom:8px;">
+          <button class="advanced-toggle" onclick="toggleAdvanced()">⚙ Advanced API Keys (optional)</button>
+        </div>
+        <div class="advanced-panel" id="advanced-panel" style="display:none">
+          <div class="input-group">
+            <label class="input-label">SHODAN API KEY</label>
+            <input id="shodan-key" class="input-field" type="password" placeholder="Your Shodan API key"/>
+          </div>
+          <div class="input-group">
+            <label class="input-label">CENSYS API ID</label>
+            <input id="censys-id" class="input-field" type="password" placeholder="Censys API ID"/>
+          </div>
+          <div class="input-group" style="grid-column:1/-1">
+            <label class="input-label">CENSYS API SECRET</label>
+            <input id="censys-secret" class="input-field" type="password" placeholder="Censys API Secret"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <button class="btn-scan" id="scan-btn" onclick="startScan()" style="width:100%">
+            ⚡ INITIATE SCAN
+          </button>
+        </div>
+        <p class="demo-notice">No API keys? Demo mode uses realistic simulated data. Add a <a href="https://account.shodan.io/" target="_blank">Shodan key</a> for live port data.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section class="container" id="progress-section" style="display:none">
+    <div class="progress-section">
+      <div class="progress-header">
+        <span class="progress-title">⚡ SCANNING TARGET</span>
+        <span class="progress-pct" id="prog-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="prog-bar" style="width:0%"></div>
+      </div>
+      <div class="progress-stage">
+        <div class="pulse-dot"></div>
+        <span id="prog-stage">Initializing...</span>
+      </div>
+      <div class="scan-log" id="scan-log"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="results container" id="results-section" style="display:none"></section>
+
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────────
+let currentJobId = null;
+let pollInterval = null;
+const API_BASE = 'http://localhost:8000';
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
+function toggleAdvanced() {
+  const p = document.getElementById('advanced-panel');
+  p.style.display = p.style.display === 'none' ? 'grid' : 'none';
+}
+
+function log(msg, type = '') {
+  const logEl = document.getElementById('scan-log');
+  const ts = new Date().toLocaleTimeString('en-US', {hour12:false});
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = `[${ts}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setProgress(pct, stage) {
+  document.getElementById('prog-pct').textContent = `${pct}%`;
+  document.getElementById('prog-bar').style.width = `${pct}%`;
+  document.getElementById('prog-stage').textContent = stage;
+}
+
+function severityColor(label) {
+  return {CRITICAL:'#FF3B3B', HIGH:'#FF7A00', MEDIUM:'#FFB800',
+          LOW:'#00C853', MINIMAL:'#00E5FF'}[label] || '#888';
+}
+
+// ── SCAN ──────────────────────────────────────────────────────────────────────
+async function startScan() {
+  const domain = document.getElementById('domain-input').value.trim();
+  if (!domain) {
+    document.getElementById('domain-input').style.borderColor = 'var(--critical)';
+    setTimeout(() => document.getElementById('domain-input').style.borderColor = '', 2000);
+    return;
+  }
+
+  const company   = document.getElementById('company-input').value.trim();
+  const shodanKey = document.getElementById('shodan-key').value.trim();
+  const forceRescan = document.getElementById('force-rescan') ?
+                      document.getElementById('force-rescan').checked : true;
+
+  document.getElementById('scan-btn').disabled = true;
+  document.getElementById('progress-section').style.display = 'block';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('scan-log').innerHTML = '';
+  setProgress(0, 'Connecting to backend...');
+
+  log(`Target: ${domain}`, 'info');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/scan`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        domain,
+        company_name: company || domain,
+        shodan_api_key: shodanKey || null,
+        force_rescan: true,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    currentJobId = data.job_id;
+
+    if (data.cached) {
+      log(`Using cached result from backend`, 'ok');
+      setProgress(100, 'Loading cached result...');
+    } else {
+      log(`Job started: ${currentJobId.slice(0,8)}...`, 'ok');
+    }
+
+    // Always poll — cached or new, we fetch the result the same way
+    pollScanStatus();
+
+  } catch (e) {
+    log('Backend not reachable — running demo mode', 'warn');
+    runDemoScan(domain, company || domain);
+  }
+}
+
+// ── POLL ──────────────────────────────────────────────────────────────────────
+async function pollScanStatus() {
+  // Simulated progress stages while backend works
+  const stages = [
+    [10, 'DNS Enumeration'],
+    [25, 'Shodan Port Scanning'],
+    [40, 'Certificate Transparency'],
+    [55, 'GitHub Secret Detection'],
+    [68, 'Email Security Analysis'],
+    [78, 'HTTP Fingerprinting'],
+    [88, 'ML Risk Scoring'],
+    [95, 'Generating Report'],
+  ];
+  let stageIdx = 0;
+
+  if (pollInterval) clearInterval(pollInterval);
+
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/scan/${currentJobId}`);
+      if (!res.ok) return;
+      const job = await res.json();
+
+      // Advance fake progress while running
+      if (job.status === 'running' || job.status === 'queued') {
+        if (stageIdx < stages.length) {
+          const [pct, stage] = stages[stageIdx];
+          setProgress(pct, stage);
+          log(stage, '');
+          stageIdx++;
+        }
+        return;
+      }
+
+      if (job.status === 'completed') {
+        clearInterval(pollInterval);
+        setProgress(100, 'Scan Complete');
+        log('Scan complete!', 'ok');
+        renderResults(job);
+        return;
+      }
+
+      if (job.status === 'failed') {
+        clearInterval(pollInterval);
+        log(`Failed: ${job.error || 'Unknown error'}`, 'err');
+        setProgress(0, 'Scan failed');
+        document.getElementById('scan-btn').disabled = false;
+        return;
+      }
+
+    } catch (e) {
+      // Network blip — keep polling
+    }
+  }, 2000);
+}
+
+// ── DEMO MODE ─────────────────────────────────────────────────────────────────
+function runDemoScan(domain, company) {
+  const stages = [
+    [10, 'DNS Enumeration & Subdomain Discovery'],
+    [25, 'Shodan Port & Service Intelligence'],
+    [40, 'Certificate Transparency Logs'],
+    [55, 'GitHub Secret & Credential Detection'],
+    [68, 'Email Security (SPF/DKIM/DMARC)'],
+    [78, 'HTTP Security Header Fingerprinting'],
+    [88, 'ML Risk Scoring Engine'],
+    [95, 'Generating Intelligence Report'],
+    [100, 'Scan Complete'],
+  ];
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i >= stages.length) {
+      clearInterval(interval);
+      renderDemoResults(domain, company);
+      return;
+    }
+    const [pct, stage] = stages[i];
+    setProgress(pct, stage);
+    log(stage, pct > 60 ? 'ok' : '');
+    i++;
+  }, 700);
+}
+
+// ── RENDER REAL RESULTS ───────────────────────────────────────────────────────
+function renderResults(job) {
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('scan-btn').disabled = false;
+
+  // API response structure
+  const scores   = job.risk_scores || {};
+  const findings = job.raw_findings || {};
+  const domain   = job.domain || 'unknown';
+  const company  = job.company || domain;
+  const scannedAt = job.created_at || new Date().toISOString();
+
+  const overall   = scores.overall || 0;
+  const riskLabel = scores.risk_label || 'UNKNOWN';
+  const riskColor = {CRITICAL:'#FF3B3B',HIGH:'#FF7A00',MEDIUM:'#FFB800',
+                     LOW:'#00C853',MINIMAL:'#00E5FF'}[riskLabel] || '#888';
+
+  const circumference = 2 * Math.PI * 54;
+  const dashOffset = circumference - (overall / 100) * circumference;
+
+  // Gather all issues across all finding categories
+  const allIssues = [];
+  const sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3};
+  for (const [cat, payload] of Object.entries(findings)) {
+    if (payload && payload.issues) {
+      for (const issue of payload.issues) {
+        allIssues.push({...issue, category: cat});
+      }
+    }
+  }
+  allIssues.sort((a,b) => (sevOrder[a.severity]||4) - (sevOrder[b.severity]||4));
+
+  const subdomains = (findings.dns && findings.dns.subdomains) || [];
+  const techStack  = (findings.technology && findings.technology.technologies) || [];
+  const missingHeaders = (findings.technology && findings.technology.missing_security_headers) || [];
+  const hosts      = (findings.shodan && findings.shodan.hosts) || [];
+  const emailData  = findings.email_security || {};
+  const spf        = emailData.spf || {};
+  const dmarc      = emailData.dmarc || {};
+  const dkim       = emailData.dkim || {};
+  const emailScore = emailData.score || 0;
+
+  const html = `
+    <div class="results-header fade-in">
+      <div class="target-info">
+        <h2>⚡ ${domain}</h2>
+        <p>${company} · Scanned ${new Date(scannedAt).toLocaleString()}</p>
+      </div>
+      <div class="action-btns">
+        <button class="btn-secondary" onclick="resetToForm()">↩ New Scan</button>
+        <button class="btn-secondary" onclick="downloadReport()">⬇ PDF Report</button>
+      </div>
+    </div>
+
+    <div class="score-grid fade-in-delay-1">
+      <div class="overall-card">
+        <div class="score-ring">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="54" fill="none" stroke="#1E2D45" stroke-width="10"/>
+            <circle cx="70" cy="70" r="54" fill="none"
+              stroke="${riskColor}" stroke-width="10"
+              stroke-dasharray="${circumference.toFixed(1)}"
+              stroke-dashoffset="${dashOffset.toFixed(1)}"
+              stroke-linecap="round"/>
+          </svg>
+          <div class="score-ring-text">
+            <span class="score-number" style="color:${riskColor}">${Math.round(overall)}</span>
+            <span class="score-max">/ 100</span>
+          </div>
+        </div>
+        <div class="risk-badge" style="color:${riskColor};border-color:${riskColor};background:${riskColor}22">
+          ${riskLabel}
+        </div>
+        <div class="breach-prob">
+          Breach probability: <strong>${Math.round((scores.breach_probability||0)*100)}%</strong>
+        </div>
+      </div>
+
+      <div class="dimension-grid">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.15em;margin-bottom:4px">RISK DIMENSIONS</div>
+        ${['Network Exposure','Data Leak','Email Security','Application Security','Human Factor'].map((name,i) => {
+          const keys = ['network_exposure','data_leak','email_security','application_security','human_factor'];
+          const score = scores[keys[i]] || 0;
+          const lbl = score >= 75 ? 'CRITICAL' : score >= 55 ? 'HIGH' : score >= 35 ? 'MEDIUM' : 'LOW';
+          const c = severityColor(lbl);
+          return `<div class="dimension-row">
+            <span class="dim-name">${name}</span>
+            <div class="dim-bar-bg"><div class="dim-bar-fill" style="width:${score}%;background:${c}"></div></div>
+            <span class="dim-score">${Math.round(score)}</span>
+            <span class="dim-label" style="color:${c};background:${c}22;border:1px solid ${c}44">${lbl}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="stat-row fade-in-delay-2">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--critical)">${scores.critical_issues||0}</div>
+        <div class="stat-label">Critical Issues</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--high)">${scores.high_issues||0}</div>
+        <div class="stat-label">High Issues</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--accent)">${subdomains.length}</div>
+        <div class="stat-label">Subdomains Found</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--medium)">${(findings.shodan&&findings.shodan.open_ports_count)||0}</div>
+        <div class="stat-label">Open Ports</div>
+      </div>
+    </div>
+
+    <div class="findings-section fade-in-delay-3">
+      <div class="section-header">
+        <span class="section-title">⚠ TOP FINDINGS</span>
+        <span class="section-count">${allIssues.length} total issues</span>
+      </div>
+      ${allIssues.slice(0,12).map(f => `
+        <div class="finding-item">
+          <span class="severity-pill sev-${f.severity}">${f.severity}</span>
+          <div>
+            <div class="finding-title">${f.title||''}</div>
+            <div class="finding-desc">${f.description||''}</div>
+            ${f.recommendation ? `<div class="finding-rec">→ ${f.recommendation}</div>` : ''}
+          </div>
+          <span class="finding-category">${(f.category||'').toUpperCase()}</span>
+        </div>`).join('')}
+    </div>
+
+    <div class="findings-section fade-in-delay-3">
+      <div class="section-header">
+        <span class="section-title">✉ EMAIL SECURITY</span>
+        <span class="section-count">Score: ${emailScore}/100</span>
+      </div>
+      <div class="email-checks">
+        ${[
+          {name:'SPF',   present:spf.present,   detail: spf.record ? 'Configured' : 'Not Found'},
+          {name:'DMARC', present:dmarc.present,  detail: dmarc.policy ? `Policy: ${dmarc.policy}` : 'Not Found'},
+          {name:'DKIM',  present:dkim.present,   detail: dkim.selectors_found&&dkim.selectors_found.length ? `Selectors: ${dkim.selectors_found.join(', ')}` : 'Not Found'},
+        ].map(c => {
+          const icon = c.present ? (c.name==='DMARC'&&dmarc.policy==='none' ? '⚠' : '✅') : '❌';
+          const cls  = c.present ? (c.name==='DMARC'&&dmarc.policy==='none' ? 'check-warn' : 'check-pass') : 'check-fail';
+          return `<div class="email-check">
+            <div class="check-icon">${icon}</div>
+            <div class="check-name ${cls}">${c.name}</div>
+            <div class="check-status ${cls}">${c.detail}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    ${subdomains.length > 0 ? `
+    <div class="findings-section fade-in-delay-3">
+      <div class="section-header">
+        <span class="section-title">🌐 DISCOVERED SUBDOMAINS</span>
+        <span class="section-count">${subdomains.length} active</span>
+      </div>
+      <div class="chips-wrap">
+        ${subdomains.map(s => `<span class="chip active">${s.subdomain||s}</span>`).join('')}
+        ${(findings.dns&&findings.dns.wildcard_dns) ? `<span class="chip" style="color:var(--medium);border-color:var(--medium)">*.${domain} (wildcard)</span>` : ''}
+      </div>
+    </div>` : ''}
+
+    ${techStack.length > 0 ? `
+    <div class="findings-section fade-in-delay-3">
+      <div class="section-header">
+        <span class="section-title">⚙ TECHNOLOGY STACK</span>
+        <span class="section-count">${missingHeaders.length} missing security headers</span>
+      </div>
+      <div class="tech-chips">
+        ${techStack.map(t => `<span class="tech-chip">${t}</span>`).join('')}
+      </div>
+      ${missingHeaders.length > 0 ? `
+      <div style="padding:0 20px 16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Missing HTTP Security Headers:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${missingHeaders.map(h => `<span class="chip" style="color:var(--critical);border-color:rgba(255,59,59,.3)">${h}</span>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>` : ''}
+
+    ${hosts.length > 0 ? `
+    <div class="findings-section fade-in-delay-3">
+      <div class="section-header">
+        <span class="section-title">🔌 EXPOSED SERVICES (SHODAN)</span>
+        <span class="section-count">${hosts.length} ports${findings.shodan&&findings.shodan.demo_mode?' · Demo Data':''}</span>
+      </div>
+      ${hosts.map(h => `
+        <div class="finding-item">
+          <span class="severity-pill ${h.cves&&h.cves.length?'sev-HIGH':'sev-LOW'}">${h.port}/${h.transport||'tcp'}</span>
+          <div>
+            <div class="finding-title">${h.product||'unknown'}${h.version?' '+h.version:''}</div>
+            <div class="finding-desc">${h.ip||''}</div>
+            ${h.cves&&h.cves.length?`<div class="finding-rec">CVEs: ${h.cves.join(', ')}</div>`:''}
+          </div>
+          <span class="finding-category">${h.ip||''}</span>
+        </div>`).join('')}
+    </div>` : ''}
+  `;
+
+  const resultsEl = document.getElementById('results-section');
+  resultsEl.innerHTML = html;
+  resultsEl.style.display = 'block';
+  resultsEl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ── DEMO RESULTS ──────────────────────────────────────────────────────────────
+function renderDemoResults(domain, company) {
+  const base = domain.split('.')[0];
+  const demoJob = {
+    domain, company,
+    created_at: new Date().toISOString(),
+    risk_scores: {
+      overall: 68, risk_label: 'HIGH', breach_probability: 0.58,
+      critical_issues: 3, high_issues: 5, medium_issues: 6, low_issues: 4,
+      network_exposure: 72, data_leak: 85, email_security: 55,
+      application_security: 48, human_factor: 40,
+    },
+    raw_findings: {
+      dns: {
+        subdomains: ['www','api','dev','staging','mail','admin','vpn','jenkins']
+                    .map(s => ({subdomain:`${s}.${domain}`})),
+        wildcard_dns: true,
+        issues: [
+          {severity:'HIGH', title:`Potential Subdomain Takeover: dev.${domain}`,
+           description:`dev.${domain} CNAME points to unclaimed Heroku app.`,
+           recommendation:'Remove the CNAME or claim the Heroku app.'}
+        ]
+      },
+      shodan: {
+        open_ports_count: 5, critical_cves: 2, demo_mode: true,
+        hosts: [
+          {ip:'203.0.113.10', port:443, transport:'tcp', product:'nginx', version:'1.14.0', cves:['CVE-2019-9511']},
+          {ip:'203.0.113.22', port:22, transport:'tcp', product:'OpenSSH', version:'7.2', cves:['CVE-2016-6515']},
+          {ip:'203.0.113.30', port:3389, transport:'tcp', product:'RDP', version:'', cves:['CVE-2019-0708']},
+          {ip:'203.0.113.45', port:6379, transport:'tcp', product:'Redis', version:'3.2.6', cves:[]},
+        ],
+        issues: [
+          {severity:'CRITICAL', title:'CVE-2019-0708 (BlueKeep) on RDP Port 3389',
+           description:'Remote code execution in Windows RDP. CVSS 9.8.',
+           recommendation:'Patch immediately. Restrict RDP behind VPN.'},
+          {severity:'CRITICAL', title:'Redis Exposed on Port 6379',
+           description:'Unauthenticated Redis accessible from internet.',
+           recommendation:'Firewall Redis. Enable requirepass in redis.conf.'},
+        ]
+      },
+      email_security: {
+        score: 45,
+        spf:   {present: false, record: null},
+        dmarc: {present: true, policy: 'none'},
+        dkim:  {present: true, selectors_found: ['google','mail']},
+        issues: [
+          {severity:'HIGH', title:'No SPF Record Found',
+           description:'Anyone can send email as your domain.',
+           recommendation:'Add: v=spf1 include:_spf.google.com -all'},
+          {severity:'MEDIUM', title:'DMARC Policy is None',
+           description:'DMARC present but not enforcing. Phishing not blocked.',
+           recommendation:'Move to p=quarantine then p=reject.'},
+        ]
+      },
+      technology: {
+        technologies: ['nginx 1.14','React 18','Cloudflare','AWS S3'],
+        missing_security_headers: ['Content-Security-Policy','Strict-Transport-Security','X-Frame-Options'],
+        issues: [
+          {severity:'MEDIUM', title:'Missing Content-Security-Policy',
+           description:'No CSP increases XSS risk.',
+           recommendation:'Implement a strict CSP policy.'},
+          {severity:'MEDIUM', title:'Missing HSTS',
+           description:'Susceptible to SSL stripping.',
+           recommendation:'Add Strict-Transport-Security header.'},
+        ]
+      },
+      github: {
+        issues: [
+          {severity:'CRITICAL', title:'Database Credentials Exposed on GitHub',
+           description:`Production DB URL found in ${base}/backend .env.backup`,
+           recommendation:'Rotate credentials. Use git-secrets to prevent future leaks.'},
+        ]
+      },
+      certificates: {issues:[]}
+    }
+  };
+  renderResults(demoJob);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function resetToForm() {
+  document.getElementById('scan-form-section').scrollIntoView({behavior:'smooth'});
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('scan-btn').disabled = false;
+}
+
+async function downloadReport() {
+  if (!currentJobId) {
+    alert(`PDF report requires a real backend scan.
+Use the Streamlit dashboard at localhost:8501 for PDF download.`);
+    return;
+  }
+  window.open(`${API_BASE}/api/report/${currentJobId}`, '_blank');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'domain-input') startScan();
+});
+window.addEventListener('load', () => {
+  document.getElementById('domain-input').focus();
+  // Add force-rescan checkbox id if not present
+  const cb = document.querySelector('input[type="checkbox"]');
+  if (cb && !cb.id) cb.id = 'force-rescan';
+});
+</script>
+</body>
+</html>

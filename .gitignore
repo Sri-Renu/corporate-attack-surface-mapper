@@ -1,0 +1,68 @@
+# ── SECRETS — never upload ─────────────────────────────────────
+.env
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+credentials.json
+
+# ── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# ── Virtual environments ────────────────────────────────────────
+venv/
+env/
+.venv/
+ENV/
+.env.local
+.env.production
+
+# ── Generated files ─────────────────────────────────────────────
+*.pdf
+reports/
+/app/reports/
+/tmp/reports/
+
+# ── IDE ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ── OS ──────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+
+# ── Testing ─────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Docker volumes (local data) ─────────────────────────────────
+postgres_data/
+redis_data/
+
+# ── Logs ────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── ML models (too large for git) ───────────────────────────────
+models/
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
